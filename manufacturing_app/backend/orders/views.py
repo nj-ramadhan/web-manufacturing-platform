@@ -6,7 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from datetime import timedelta
 
-from .models import Order, ProductionStage, OrderUpdate
+from .models import Profile, Order, ProductionStage, OrderUpdate
 from .serializers import (
     OrderSerializer, ProductionStageSerializer, 
     OrderUpdateSerializer, GuestQuoteRequestSerializer
@@ -28,7 +28,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             return Order.objects.all().prefetch_related('stages', 'updates')
         # Customer sees only their orders
         return Order.objects.filter(
-            models.Q(user=user) | models.Q(customer_email=user.email)
+            Profile.Q(user=user) | Profile.Q(customer_email=user.email)
         ).prefetch_related('stages', 'updates')
     
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
