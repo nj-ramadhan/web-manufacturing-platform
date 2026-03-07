@@ -20,7 +20,7 @@ class Quote(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     quote_number = models.CharField(max_length=20, unique=True, editable=False)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='quotes')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='quotes')
     
     # Link to uploaded file
     uploaded_file = models.ForeignKey('files.UploadedFile', on_delete=models.CASCADE, related_name='quotes')

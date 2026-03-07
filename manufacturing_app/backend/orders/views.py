@@ -136,7 +136,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 class GuestQuoteViewSet(viewsets.ViewSet):
     """Public endpoint for quote requests without authentication"""
     permission_classes = [permissions.AllowAny]
-    
+        
     def create(self, request):
         """Submit a quote request as guest"""
         serializer = GuestQuoteRequestSerializer(data=request.data)
@@ -146,16 +146,16 @@ class GuestQuoteViewSet(viewsets.ViewSet):
         
         validated = serializer.validated_data
         
-        # Create a "pending" quote for guest
+        # Get uploaded file
         from files.models import UploadedFile
         try:
             uploaded_file = UploadedFile.objects.get(id=validated['file_id'])
         except UploadedFile.DoesNotExist:
             return Response({'file_id': 'File tidak ditemukan'}, status=400)
         
-        # Create quote (will be converted to order when accepted)
+        # ⚠️ CREATE QUOTE WITH user=None FOR GUESTS
         quote = Quote.objects.create(
-            user=None,  # Guest order
+            user=None,  # ⚠️ Guest order - no user
             uploaded_file=uploaded_file,
             manufacturing_type=validated['manufacturing_type'],
             material=validated['material'],
@@ -165,7 +165,7 @@ class GuestQuoteViewSet(viewsets.ViewSet):
             status='PENDING',
         )
         
-        # Create order in QUOTE_SENT status
+        # Create order
         order = Order.objects.create(
             customer_name=validated['name'],
             customer_email=validated['email'],
@@ -188,9 +188,6 @@ class GuestQuoteViewSet(viewsets.ViewSet):
             message=f"Terima kasih {validated['name']}! Tim kami akan menghubungi Anda via {validated['email']} atau {validated['phone']} dalam 1x24 jam untuk konfirmasi penawaran.",
             update_type='INFO'
         )
-        
-        # TODO: Send confirmation email to guest
-        # send_guest_quote_confirmation(order, validated)
         
         return Response({
             'message': 'Permintaan penawaran berhasil dikirim!',

@@ -1,7 +1,7 @@
 # backend/files/views.py
 
 from rest_framework import viewsets, status, parsers  # Make sure parsers is imported
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
@@ -11,6 +11,56 @@ from .models import UploadedFile
 from .serializers import UploadedFileSerializer
 from .analyzers import analyze_file
 from pricing.calculator import PricingCalculator
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def public_file_upload(request):
+    """
+    Public file upload for guest quote requests
+    No authentication required
+    """
+    from .serializers import UploadedFileSerializer
+    from .analyzers import analyze_file
+    
+    serializer = UploadedFileSerializer(data=request.data)
+    
+    if serializer.is_valid():
+        # Save without user (guest upload)
+        uploaded_file = serializer.save(user=None)
+        
+        # Analyze file
+        if uploaded_file.file and uploaded_file.file.path:
+            file_path = uploaded_file.file.path
+            file_ext = uploaded_file.original_filename.split('.')[-1].lower()
+            
+            try:
+                analysis_result = analyze_file(file_path, f'.{file_ext}')
+                
+                uploaded_file.volume = analysis_result.get('volume')
+                uploaded_file.surface_area = analysis_result.get('surface_area')
+                uploaded_file.bounding_box_x = analysis_result.get('bounding_box_x')
+                uploaded_file.bounding_box_y = analysis_result.get('bounding_box_y')
+                uploaded_file.bounding_box_z = analysis_result.get('bounding_box_z')
+                uploaded_file.weight = analysis_result.get('weight')
+                uploaded_file.is_valid = analysis_result.get('is_valid', False)
+                uploaded_file.validation_errors = analysis_result.get('validation_errors')
+                uploaded_file.save(update_fields=[
+                    'volume', 'surface_area', 'bounding_box_x', 'bounding_box_y',
+                    'bounding_box_z', 'weight', 'is_valid', 'validation_errors'
+                ])
+            except Exception as e:
+                uploaded_file.is_valid = False
+                uploaded_file.validation_errors = str(e)
+                uploaded_file.save(update_fields=['is_valid', 'validation_errors'])
+        
+        # Return serialized data
+        return Response(
+            UploadedFileSerializer(uploaded_file, context={'request': request}).data,
+            status=status.HTTP_201_CREATED
+        )
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class FileUploadViewSet(viewsets.ModelViewSet):
     serializer_class = UploadedFileSerializer

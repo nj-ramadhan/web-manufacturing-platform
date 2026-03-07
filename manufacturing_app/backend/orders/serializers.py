@@ -145,8 +145,8 @@ class GuestQuoteRequestSerializer(serializers.Serializer):
     deadline = serializers.DateField(required=False, allow_null=True)
     
     # Consent
-    agree_to_terms = serializers.BooleanField()
-    agree_to_contact = serializers.BooleanField()
+    agree_to_terms = serializers.BooleanField(required=True)
+    agree_to_contact = serializers.BooleanField(required=False, default=False)
     
     def validate(self, data):
         if not data.get('agree_to_terms'):

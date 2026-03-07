@@ -5,7 +5,13 @@ import os
 
 def upload_to(instance, filename):
     ext = os.path.splitext(filename)[1]
-    return f'uploads/{instance.user.id}/{uuid.uuid4()}{ext}'
+    if instance.user:
+        # Authenticated user - organize by user ID
+        user_path = f'users/{instance.user.id}'
+    else:
+        # Guest upload - use 'guests' folder
+        user_path = 'guests'
+    return f'uploads/{user_path}/{uuid.uuid4()}{ext}'
 
 class UploadedFile(models.Model):
     MANUFACTURING_TYPES = [
@@ -35,4 +41,4 @@ class UploadedFile(models.Model):
         ordering = ['-uploaded_at']
     
     def __str__(self):
-        return f"{self.original_filename} - {self.user.username}"
+        return f"{self.original_filename} - {self.user.username if self.user else 'Guest'}"

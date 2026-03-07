@@ -11,7 +11,7 @@ import {
 } from '@mui/material';
 import {
   CloudUpload as UploadIcon,
-  CheckCircle as CheckIcon,
+  CheckCircle as CheckCircleIcon,
   Info as InfoIcon,
   WhatsApp as WhatsAppIcon
 } from '@mui/icons-material';
@@ -83,14 +83,12 @@ const PublicQuoteRequest = () => {
     setError(null);
 
     try {
-      // ⚠️ USE PUBLIC ENDPOINT (no auth required)
       const response = await axios.post(
         'http://localhost:8000/api/public-upload/',  // Changed from /api/files/
         formData,
         {
           headers: { 
             'Content-Type': 'multipart/form-data'
-            // ⚠️ NO Authorization header needed for public upload
           },
         }
       );
@@ -139,14 +137,23 @@ const PublicQuoteRequest = () => {
       return;
     }
     if (activeStep === 2) {
-      if (!formData.name || !formData.email || !formData.phone) {
-        setError('Lengkapi data kontak Anda');
+      if (!formData.name || formData.name.trim() === '') {
+        setError('Nama lengkap harus diisi');
+        return;
+      }
+      if (!formData.email || !formData.email.includes('@')) {
+        setError('Email harus valid');
+        return;
+      }
+      if (!formData.phone || formData.phone.trim() === '') {
+        setError('Nomor WhatsApp/Telepon harus diisi');
         return;
       }
       if (!formData.agree_to_terms) {
         setError('Anda harus menyetujui syarat & ketentuan');
         return;
       }
+      // Don't require agree_to_contact - make it optional in backend
       submitQuoteRequest();
       return;
     }
@@ -159,27 +166,44 @@ const PublicQuoteRequest = () => {
     setError(null);
   };
 
-  const submitQuoteRequest = async () => {
-    setLoading(true);
-    setError(null);
+const submitQuoteRequest = async () => {
+  setLoading(true);
+  setError(null);
 
-    try {
-      const payload = {
-        ...formData,
-        file_id: uploadedFile.id,
-      };
+  try {
+    const payload = {
+      ...formData,
+      file_id: uploadedFile.id,
+    };
 
-      const response = await axios.post(`${API_BASE}/guest-quotes/`, payload);
-      
-      setSuccess(response.data.message);
-      setOrderNumber(response.data.order_number);
-      setActiveStep(3); // Success step
-    } catch (err) {
-      setError(err.response?.data?.message || 'Gagal mengirim permintaan');
-    } finally {
-      setLoading(false);
+    if (!payload.deadline || payload.deadline === '') {
+      payload.deadline = null;
     }
-  };
+    
+    payload.quantity = parseInt(payload.quantity) || 1;
+    
+    payload.agree_to_terms = Boolean(payload.agree_to_terms);
+    payload.agree_to_contact = Boolean(payload.agree_to_contact);
+
+    console.log('[Guest Quote Payload]', payload);
+
+    const response = await axios.post(`${API_BASE}/guest-quotes/`, payload);
+    
+    setSuccess(response.data.message);
+    setOrderNumber(response.data.order_number);
+    setActiveStep(3);
+  } catch (err) {
+    console.error('[Guest Quote Error]', err.response?.status);
+    console.error('[Guest Quote Error Data]', err.response?.data);
+    
+    const errorMsg = err.response?.data 
+      ? JSON.stringify(err.response.data) 
+      : 'Gagal mengirim permintaan';
+    setError(`Error: ${errorMsg}`);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const getStepContent = (step) => {
     switch (step) {
@@ -274,96 +298,150 @@ const PublicQuoteRequest = () => {
           </Box>
         );
 
-      case 1:
-        return (
-          <Box>
-            <Typography variant="h6" gutterBottom fontWeight="bold">
-              ⚙️ Detail Proyek
-            </Typography>
-
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <FormControl fullWidth>
-                  <InputLabel>Jenis Produksi</InputLabel>
-                  <Select
-                    value={formData.manufacturing_type}
-                    label="Jenis Produksi"
-                    onChange={(e) => handleChange('manufacturing_type', e.target.value)}
-                  >
-                    <MenuItem value="3D_PRINTING">🖨️ Cetak 3D (FDM)</MenuItem>
-                    <MenuItem value="CNC_MACHINING">🔧 CNC Machining</MenuItem>
-                    <MenuItem value="LASER_CUTTING">✨ Laser Cutting</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={12}>
-                <FormControl fullWidth>
-                  <InputLabel>Material</InputLabel>
-                  <Select
-                    value={formData.material}
-                    label="Material"
-                    onChange={(e) => handleChange('material', e.target.value)}
-                  >
-                    {MATERIALS[formData.manufacturing_type]?.map((mat) => (
-                      <MenuItem key={mat.value} value={mat.value}>
-                        {mat.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Jumlah Unit"
-                  type="number"
-                  value={formData.quantity}
-                  onChange={(e) => handleChange('quantity', parseInt(e.target.value) || 1)}
-                  inputProps={{ min: 1 }}
-                />
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Target Selesai (Opsional)"
-                  type="date"
-                  value={formData.deadline}
-                  onChange={(e) => handleChange('deadline', e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Catatan Tambahan"
-                  placeholder="Contoh: Butuh finishing cat, toleransi dimensi ±0.1mm, dll."
-                  multiline
-                  rows={4}
-                  value={formData.requirements}
-                  onChange={(e) => handleChange('requirements', e.target.value)}
-                />
-              </Grid>
-            </Grid>
-
-            {/* Price Estimate Hint */}
-            <Alert 
-              icon={<InfoIcon />} 
-              severity="info" 
-              sx={{ mt: 2 }}
-            >
-              <Typography variant="body2">
-                💡 <strong>Estimasi Harga:</strong> Berdasarkan file Anda, 
-                perkiraan harga mulai dari {formatIDR(50000)} - {formatIDR(500000)} 
-                tergantung material dan finishing. Harga final akan dikonfirmasi 
-                oleh tim kami setelah review.
+        case 1:
+          return (
+            <Box>
+              <Typography variant="h6" gutterBottom fontWeight="bold">
+                ⚙️ Detail Proyek
               </Typography>
-            </Alert>
-          </Box>
-        );
+
+              {/* ⚠️ ADD: 3D Preview Section at Top */}
+              {uploadedFile && fileAnalysis && (
+                <Paper 
+                  variant="outlined" 
+                  sx={{ 
+                    p: 2, 
+                    mb: 3, 
+                    bgcolor: 'background.default',
+                    border: '2px solid',
+                    borderColor: 'success.main'
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <CheckCircleIcon color="success" />
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      File Teranalisis: {uploadedFile.original_filename}
+                    </Typography>
+                  </Box>
+                  
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={5}>
+                      {/* ⚠️ 3D Viewer */}
+                      <ThreeDViewer fileUrl={uploadedFile.file_url} />
+                    </Grid>
+                    <Grid item xs={12} md={7}>
+                      {/* File Info */}
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
+                          <Typography variant="body2" color="textSecondary">📦 Volume</Typography>
+                          <Typography variant="body2" fontWeight="bold">{fileAnalysis.volume?.toFixed(2)} cm³</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
+                          <Typography variant="body2" color="textSecondary">⚖️ Berat</Typography>
+                          <Typography variant="body2" fontWeight="bold">{fileAnalysis.weight?.toFixed(1)} gram</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
+                          <Typography variant="body2" color="textSecondary">📐 Dimensi</Typography>
+                          <Typography variant="body2" fontWeight="bold">
+                            {fileAnalysis.dimensions.x?.toFixed(1)} × {fileAnalysis.dimensions.y?.toFixed(1)} × {fileAnalysis.dimensions.z?.toFixed(1)} mm
+                          </Typography>
+                        </Box>
+                        <Chip 
+                          label="✓ Valid untuk produksi" 
+                          color="success" 
+                          size="small"
+                          sx={{ alignSelf: 'flex-start', mt: 1 }}
+                        />
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </Paper>
+              )}
+
+              {/* Rest of Step 1 form fields */}
+              <Grid container spacing={3}>
+                <Grid item xs={12}>
+                  <FormControl fullWidth>
+                    <InputLabel>Jenis Produksi</InputLabel>
+                    <Select
+                      value={formData.manufacturing_type}
+                      label="Jenis Produksi"
+                      onChange={(e) => handleChange('manufacturing_type', e.target.value)}
+                    >
+                      <MenuItem value="3D_PRINTING">🖨️ Cetak 3D (FDM)</MenuItem>
+                      <MenuItem value="CNC_MACHINING">🔧 CNC Machining</MenuItem>
+                      <MenuItem value="LASER_CUTTING">✨ Laser Cutting</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <FormControl fullWidth>
+                    <InputLabel>Material</InputLabel>
+                    <Select
+                      value={formData.material}
+                      label="Material"
+                      onChange={(e) => handleChange('material', e.target.value)}
+                    >
+                      {MATERIALS[formData.manufacturing_type]?.map((mat) => (
+                        <MenuItem key={mat.value} value={mat.value}>
+                          {mat.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Jumlah Unit"
+                    type="number"
+                    value={formData.quantity}
+                    onChange={(e) => handleChange('quantity', parseInt(e.target.value) || 1)}
+                    inputProps={{ min: 1 }}
+                  />
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Target Selesai (Opsional)"
+                    type="date"
+                    value={formData.deadline}
+                    onChange={(e) => handleChange('deadline', e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Catatan Tambahan"
+                    placeholder="Contoh: Butuh finishing cat, toleransi dimensi ±0.1mm, dll."
+                    multiline
+                    rows={4}
+                    value={formData.requirements}
+                    onChange={(e) => handleChange('requirements', e.target.value)}
+                  />
+                </Grid>
+              </Grid>
+
+              {/* Price Estimate Hint */}
+              <Alert 
+                icon={<InfoIcon />} 
+                severity="info" 
+                sx={{ mt: 2 }}
+              >
+                <Typography variant="body2">
+                  💡 <strong>Estimasi Harga:</strong> Berdasarkan file Anda, 
+                  perkiraan harga mulai dari {formatIDR(50000)} - {formatIDR(500000)} 
+                  tergantung material dan finishing. Harga final akan dikonfirmasi 
+                  oleh tim kami setelah review.
+                </Typography>
+              </Alert>
+            </Box>
+          );
 
       case 2:
         return (
@@ -468,7 +546,7 @@ const PublicQuoteRequest = () => {
       case 3:
         return (
           <Box sx={{ textAlign: 'center', py: 4 }}>
-            <CheckIcon sx={{ fontSize: 80, color: 'success.main', mb: 2 }} />
+            <CheckCircleIcon sx={{ fontSize: 80, color: 'success.main', mb: 2 }} />
             <Typography variant="h5" fontWeight="bold" gutterBottom>
               🎉 Permintaan Berhasil!
             </Typography>
@@ -583,7 +661,7 @@ const PublicQuoteRequest = () => {
               variant="contained"
               onClick={handleNext}
               disabled={loading}
-              endIcon={activeStep === 2 ? <CheckIcon /> : undefined}
+              endIcon={activeStep === 2 ? <CheckCircleIcon /> : undefined}
             >
               {loading ? (
                 <CircularProgress size={20} color="inherit" />
