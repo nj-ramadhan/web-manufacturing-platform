@@ -3,9 +3,9 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  AppBar, Toolbar, Typography, Button, Box, IconButton, Avatar, Menu, MenuItem
+  AppBar, Toolbar, Typography, Button, Box, IconButton, Avatar, Menu, MenuItem, Divider
 } from '@mui/material';
-import { Menu as MenuIcon, Factory as FactoryIcon } from '@mui/icons-material';
+import { Menu as MenuIcon, Factory as FactoryIcon, Dashboard, TrackChanges, AdminPanelSettings } from '@mui/icons-material';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -16,6 +16,10 @@ const Navbar = () => {
   const handleClose = () => setAnchorEl(null);
 
   const isActive = (path) => location.pathname === path;
+
+  // Check if user is admin
+  const isAdmin = user?.role === 'ADMIN' || user?.is_staff;
+  const isCustomer = user?.role === 'CUSTOMER' || (user && !isAdmin);
 
   return (
     <AppBar 
@@ -47,8 +51,9 @@ const Navbar = () => {
           </Typography>
         </Box>
 
-        {/* Desktop Navigation */}
-        <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 1 }}>
+        {/* Desktop Navigation - Role Based */}
+        <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 1, alignItems: 'center' }}>
+          {/* Public Link - Always visible */}
           <Button
             component={Link}
             to="/public-quote"
@@ -58,40 +63,61 @@ const Navbar = () => {
             🚀 Minta Penawaran
           </Button>
           
-          {user ? (
+          {/* Customer Links */}
+          {isCustomer && (
             <>
-              {user.is_staff && (
-                <Button
-                  component={Link}
-                  to="/admin-dashboard"
-                  color={isActive('/admin-dashboard') ? 'primary' : 'inherit'}
-                >
-                  🏭 Admin
-                </Button>
-              )}
               <Button
                 component={Link}
                 to="/dashboard"
                 color={isActive('/dashboard') ? 'primary' : 'inherit'}
+                startIcon={<TrackChanges />}
               >
-                📋 Pesanan Saya
+                Pesanan Saya
+              </Button>
+              <Button
+                component={Link}
+                to="/upload"
+                color={isActive('/upload') ? 'primary' : 'inherit'}
+              >
+                📤 Upload File
               </Button>
             </>
-          ) : (
-            <Button component={Link} to="/login" color="inherit">
-              Login
+          )}
+          
+          {/* Admin Links */}
+          {isAdmin && (
+            <Button
+              component={Link}
+              to="/admin-dashboard"
+              color={isActive('/admin-dashboard') ? 'primary' : 'inherit'}
+              startIcon={<AdminPanelSettings />}
+            >
+              🏭 Admin
             </Button>
           )}
+          
+          {/* Auth Buttons */}
+          {!user ? (
+            <>
+              <Button component={Link} to="/login" variant="outlined">
+                Login
+              </Button>
+              <Button component={Link} to="/register" variant="contained">
+                Register
+              </Button>
+            </>
+          ) : null}
         </Box>
 
         {/* User Menu */}
         {user ? (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }}>
-              Halo, {user.username}
+              {user.username}
+              {isAdmin && <span style={{ marginLeft: '4px', color: '#dc004e' }}>👑</span>}
             </Typography>
             <IconButton onClick={handleMenu} size="small">
-              <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
+              <Avatar sx={{ width: 32, height: 32, bgcolor: isAdmin ? 'secondary.main' : 'primary.main' }}>
                 {user.username?.[0]?.toUpperCase()}
               </Avatar>
             </IconButton>
@@ -102,9 +128,19 @@ const Navbar = () => {
               anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
               transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
-              <MenuItem component={Link} to="/dashboard" onClick={handleClose}>
-                Dashboard
-              </MenuItem>
+              {isCustomer && (
+                <MenuItem component={Link} to="/dashboard" onClick={handleClose}>
+                  <Dashboard fontSize="small" sx={{ mr: 1 }} />
+                  Dashboard
+                </MenuItem>
+              )}
+              {isAdmin && (
+                <MenuItem component={Link} to="/admin-dashboard" onClick={handleClose}>
+                  <AdminPanelSettings fontSize="small" sx={{ mr: 1 }} />
+                  Admin Panel
+                </MenuItem>
+              )}
+              <Divider />
               <MenuItem onClick={() => { logout(); handleClose(); }}>
                 Logout
               </MenuItem>

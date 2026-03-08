@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  Container, Box, TextField, Button, Typography, Paper, Alert
+  Container, Box, TextField, Button, Typography, Paper, Alert,
+  Grid, FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 
 const Register = () => {
@@ -11,6 +12,7 @@ const Register = () => {
     email: '',
     password: '',
     password_confirm: '',
+    role: 'CUSTOMER',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -48,7 +50,10 @@ const Register = () => {
       <Box sx={{ mt: 8 }}>
         <Paper elevation={3} sx={{ p: 4 }}>
           <Typography variant="h4" align="center" gutterBottom>
-            Register
+            Buat Akun Baru
+          </Typography>
+          <Typography variant="body2" color="textSecondary" align="center" sx={{ mb: 3 }}>
+            Bergabung untuk mengelola pesanan produksi Anda
           </Typography>
           
           {error && (
@@ -58,45 +63,67 @@ const Register = () => {
           )}
 
           <form onSubmit={handleSubmit}>
-            <TextField
-              fullWidth
-              label="Username"
-              name="username"
-              value={formData.username}
-              onChange={handleChange}
-              margin="normal"
-              required
-            />
-            <TextField
-              fullWidth
-              label="Email"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              margin="normal"
-              required
-            />
-            <TextField
-              fullWidth
-              label="Password"
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={handleChange}
-              margin="normal"
-              required
-            />
-            <TextField
-              fullWidth
-              label="Confirm Password"
-              name="password_confirm"
-              type="password"
-              value={formData.password_confirm}
-              onChange={handleChange}
-              margin="normal"
-              required
-            />
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Username"
+                  name="username"
+                  value={formData.username}
+                  onChange={handleChange}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Tipe Akun</InputLabel>
+                  <Select
+                    name="role"
+                    value={formData.role}
+                    label="Tipe Akun"
+                    onChange={handleChange}
+                    disabled={loading}
+                  >
+                    <MenuItem value="CUSTOMER">👤 Customer - Pesan & Lacak Produksi</MenuItem>
+                    <MenuItem value="GUEST" disabled>🚶 Guest - Hanya Request Penawaran</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Password"
+                  name="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                  helperText="Minimal 8 karakter"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Konfirmasi Password"
+                  name="password_confirm"
+                  type="password"
+                  value={formData.password_confirm}
+                  onChange={handleChange}
+                  required
+                />
+              </Grid>
+            </Grid>
             <Button
               type="submit"
               variant="contained"
@@ -110,7 +137,7 @@ const Register = () => {
           </form>
 
           <Typography align="center" sx={{ mt: 2 }}>
-            Already have an account?{' '}
+            Sudah punya akun?{' '}
             <Link to="/login">Login</Link>
           </Typography>
         </Paper>

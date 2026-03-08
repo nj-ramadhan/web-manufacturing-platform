@@ -24,24 +24,42 @@ class RegisterView(generics.CreateAPIView):
         # Create auth token
         token, _ = Token.objects.get_or_create(user=user)
         
+        # Get user role
+        try:
+            profile = user.profile
+            role = profile.role
+        except Profile.DoesNotExist:
+            role = 'CUSTOMER'
+        
         return Response({
             'user': UserSerializer(user).data,
             'token': token.key,
+            'role': role,
             'message': 'Registration successful'
         }, status=status.HTTP_201_CREATED)
 
 class LoginView(ObtainAuthToken):
-    """User login endpoint"""
+    """User login endpoint with role information"""
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
         token, _ = Token.objects.get_or_create(user=user)
         
+        # Get user role
+        try:
+            profile = user.profile
+            role = profile.role
+        except Profile.DoesNotExist:
+            role = 'CUSTOMER'
+        
         return Response({
             'token': token.key,
             'user_id': user.pk,
-            'username': user.username
+            'username': user.username,
+            'email': user.email,
+            'is_staff': user.is_staff,
+            'role': role
         })
 
 class LogoutView(APIView):
@@ -67,7 +85,7 @@ class ProfileView(generics.RetrieveUpdateAPIView):
         return profile
 
 class UserProfileView(generics.RetrieveAPIView):
-    """Get current user info"""
+    """Get current user info with role"""
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
     
