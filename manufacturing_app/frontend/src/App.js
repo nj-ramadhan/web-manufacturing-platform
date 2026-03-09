@@ -1,68 +1,197 @@
 // frontend/src/App.js
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { Box } from '@mui/material';
+
+// Layouts
+import MainLayout from '././components/layout/MainLayout';
+import AuthLayout from '././components/layout/AuthLayout';
 
 // Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import CustomerDashboard from './pages/CustomerDashboard';
-import AdminDashboard from './pages/AdminDashboard';
-import UploadFile from './pages/UploadFile';
-import QuoteGenerator from './pages/QuoteGenerator';
+import Dashboard from './pages/CustomerDashboard';
 import PublicQuoteRequest from './pages/PublicQuoteRequest';
+import JobBoard from './pages/JobBoard';
+import ProductionBoard from './pages/ProductionBoard';
+import PricingTools from './pages/PricingTools';
+import AnalyticsDashboard from './pages/AnalyticsDashboard';
+import Customers from './pages/Customers';
+import QuotesList from './pages/QuotesList';
+import OrdersList from './pages/OrdersList';
+import Integrations from './pages/Integrations';
+import StoreFront from './pages/StoreFront';
+import Billing from './pages/Billing';
+import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 
-// Components
-import Navbar from './components/Navbar';
-import PrivateRoute from './components/PrivateRoute';
-import AdminRoute from './components/AdminRoute';
+// Pages that should NOT have sidebar
+const publicPages = ['/login', '/register', '/public-quote'];
+
+// App Content Component - checks location
+const AppContent = () => {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+
+  // Check if current path is a public page
+  const isPublicPage = publicPages.some(path => location.pathname === path || location.pathname.startsWith(path + '/'));
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        Loading...
+      </Box>
+    );
+  }
+
+  return (
+    <Routes>
+      {/* Public Routes - NO SIDEBAR */}
+      <Route path="/login" element={isPublicPage ? <AuthLayout><Login /></AuthLayout> : <Login />} />
+      <Route path="/register" element={isPublicPage ? <AuthLayout><Register /></AuthLayout> : <Register />} />
+      <Route path="/public-quote" element={<PublicQuoteRequest />} />
+      
+      {/* Protected Routes - WITH SIDEBAR */}
+      <Route 
+        path="/dashboard" 
+        element={
+          user ? (
+            <MainLayout><Dashboard /></MainLayout>
+          ) : (
+            <Navigate to="/login" state={{ from: location }} replace />
+          )
+        } 
+      />
+      <Route 
+        path="/job-board" 
+        element={
+          user ? (
+            <MainLayout><JobBoard /></MainLayout>
+          ) : (
+            <Navigate to="/login" state={{ from: location }} replace />
+          )
+        } 
+      />
+      <Route 
+        path="/production" 
+        element={
+          user ? (
+            <MainLayout><ProductionBoard /></MainLayout>
+          ) : (
+            <Navigate to="/login" state={{ from: location }} replace />
+          )
+        } 
+      />
+      <Route 
+        path="/pricing-tools" 
+        element={
+          user ? (
+            <MainLayout><PricingTools /></MainLayout>
+          ) : (
+            <Navigate to="/login" state={{ from: location }} replace />
+          )
+        } 
+      />
+      <Route 
+        path="/analytics" 
+        element={
+          user ? (
+            <MainLayout><AnalyticsDashboard /></MainLayout>
+          ) : (
+            <Navigate to="/login" state={{ from: location }} replace />
+          )
+        } 
+      />
+      <Route 
+        path="/customers" 
+        element={
+          user ? (
+            <MainLayout><Customers /></MainLayout>
+          ) : (
+            <Navigate to="/login" state={{ from: location }} replace />
+          )
+        } 
+      />
+      <Route 
+        path="/quotes" 
+        element={
+          user ? (
+            <MainLayout><QuotesList /></MainLayout>
+          ) : (
+            <Navigate to="/login" state={{ from: location }} replace />
+          )
+        } 
+      />
+      <Route 
+        path="/orders" 
+        element={
+          user ? (
+            <MainLayout><OrdersList /></MainLayout>
+          ) : (
+            <Navigate to="/login" state={{ from: location }} replace />
+          )
+        } 
+      />
+      <Route 
+        path="/integrations" 
+        element={
+          user ? (
+            <MainLayout><Integrations /></MainLayout>
+          ) : (
+            <Navigate to="/login" state={{ from: location }} replace />
+          )
+        } 
+      />
+      <Route 
+        path="/storefront" 
+        element={
+          user ? (
+            <MainLayout><StoreFront /></MainLayout>
+          ) : (
+            <Navigate to="/login" state={{ from: location }} replace />
+          )
+        } 
+      />
+      <Route 
+        path="/billing" 
+        element={
+          user ? (
+            <MainLayout><Billing /></MainLayout>
+          ) : (
+            <Navigate to="/login" state={{ from: location }} replace />
+          )
+        } 
+      />
+      <Route 
+        path="/settings" 
+        element={
+          user ? (
+            <MainLayout><Settings /></MainLayout>
+          ) : (
+            <Navigate to="/login" state={{ from: location }} replace />
+          )
+        } 
+      />
+      
+      {/* Redirects */}
+      <Route path="/" element={<Navigate to={user ? "/dashboard" : "/public-quote"} />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+};
 
 const theme = createTheme({
   palette: {
     primary: { main: '#1976d2' },
     secondary: { main: '#dc004e' },
-    success: { main: '#2e7d32' },
-    warning: { main: '#ed6c02' },
   },
   typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-  },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
-          borderRadius: 8,
-        },
-      },
-    },
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          borderRadius: 12,
-        },
-      },
-    },
+    fontFamily: '"Inter", "Roboto", sans-serif',
   },
 });
-
-// Role-based route wrapper
-const RoleRoute = ({ children, allowedRoles }) => {
-  const { user, loading } = useAuth();
-  
-  if (loading) return <div>Memuat...</div>;
-  if (!user) return <Navigate to="/login" />;
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/dashboard" />;
-  }
-  return children;
-};
 
 function App() {
   return (
@@ -70,57 +199,7 @@ function App() {
       <CssBaseline />
       <AuthProvider>
         <Router>
-          <Navbar />
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<Navigate to="/public-quote" />} />
-            <Route path="/public-quote" element={<PublicQuoteRequest />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            
-            {/* Customer Routes */}
-            <Route
-              path="/dashboard"
-              element={
-                <PrivateRoute>
-                  <CustomerDashboard />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/upload"
-              element={
-                <PrivateRoute>
-                  <UploadFile />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/quote/:fileId"
-              element={
-                <PrivateRoute>
-                  <QuoteGenerator />
-                </PrivateRoute>
-              }
-            />
-            
-            {/* Admin Routes */}
-            <Route
-              path="/admin-dashboard"
-              element={
-                <RoleRoute allowedRoles={['admin', 'staff']}>
-                  <AdminDashboard />
-                </RoleRoute>
-              }
-            />
-            
-            {/* Legacy Dashboard (redirect to customer) */}
-            <Route path="/old-dashboard" element={<Dashboard />} />
-            
-            {/* 404 */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <ToastContainer position="bottom-right" />
+          <AppContent />
         </Router>
       </AuthProvider>
     </ThemeProvider>

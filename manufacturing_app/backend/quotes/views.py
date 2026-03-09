@@ -26,21 +26,65 @@ class QuoteViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def accept(self, request, pk=None):
-        """Accept quote and mark as accepted"""
+        """Accept quote and convert to order"""
         quote = self.get_object()
+        
         if quote.status != 'PENDING':
             return Response(
                 {'error': f'Quote cannot be accepted (current status: {quote.status})'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
         quote.status = 'ACCEPTED'
         quote.save()
         
-        # TODO: Trigger order creation here
-        # from orders.services import create_order_from_quote
-        # create_order_from_quote(quote)
+        from orders.models import Order, ProductionStage
         
-        return Response({'status': 'Quote accepted', 'quote_number': quote.quote_number})
+        order = Order.objects.create(
+            customer_name=request.user.get_full_name() or request.user.username,
+            customer_email=request.user.email,
+            customer_phone='',  # User should add this in profile
+            customer_company='',
+            user=request.user,  # ⚠️ LINK TO LOGGED-IN USER
+            quote=quote,
+            manufacturing_type=quote.manufacturing_type,
+            material=quote.material,
+            quantity=quote.quantity,
+            unit_price=quote.unit_price,
+            total_price=quote.total_price,
+            status='CONFIRMED',  # Start from CONFIRMED
+        )
+        
+        # Create default production stages
+        stages_config = {
+            '3D_PRINTING': ['FILE_CHECK', 'MATERIAL_PREP', 'SETUP', 'PRODUCTION', 'POST_PROCESS', 'QC', 'PACKING'],
+            'CNC_MACHINING': ['FILE_CHECK', 'MATERIAL_PREP', 'SETUP', 'PRODUCTION', 'POST_PROCESS', 'QC', 'PACKING'],
+            'LASER_CUTTING': ['FILE_CHECK', 'MATERIAL_PREP', 'SETUP', 'PRODUCTION', 'QC', 'PACKING'],
+        }
+        
+        stage_list = stages_config.get(order.manufacturing_type, stages_config['3D_PRINTING'])
+        
+        for stage_name in stage_list:
+            ProductionStage.objects.create(
+                order=order,
+                stage=stage_name,
+                estimated_duration_hours=2 if stage_name == 'PRODUCTION' else 0.5
+            )
+        
+        # Create initial update
+        from orders.models import OrderUpdate
+        OrderUpdate.objects.create(
+            order=order,
+            title="Pesanan Dikonfirmasi",
+            message=f"Terima kasih! Pesanan {order.order_number} telah dikonfirmasi dan akan segera diproses.",
+            update_type='PROGRESS'
+        )
+        
+        return Response({
+            'status': 'Quote accepted', 
+            'quote_number': quote.quote_number,
+            'order_number': order.order_number
+        })
     
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):

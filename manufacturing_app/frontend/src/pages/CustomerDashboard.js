@@ -1,13 +1,12 @@
-// frontend/src/pages/CustomerDashboard.js
+// frontend/src/pages/CustomerDashboard.js - COMPLETE WORKING VERSION
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { orderAPI } from '../services/api';
-import { formatIDR } from '../utils/currency';
 import {
   Container, Box, Typography, Paper, Grid, Button, Card, CardContent,
   Chip, LinearProgress, Divider, Tabs, Tab, Avatar, IconButton,
-  Dialog, DialogTitle, DialogContent, DialogActions
+  Dialog, DialogTitle, DialogContent, DialogActions, Alert
 } from '@mui/material';
 import {
   TrackChanges as TrackIcon,
@@ -15,9 +14,13 @@ import {
   Add as AddIcon,
   WhatsApp as WhatsAppIcon,
   Email as EmailIcon,
-  ExpandMore as ExpandMoreIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  Schedule as ScheduleIcon
 } from '@mui/icons-material';
+import { formatIDR } from '../utils/currency';
+import { orderAPI } from '../services/api';
+import ThreeDViewer from '../components/ThreeDViewer';
+import { getFileUrl } from '../utils/url';
 
 const CustomerDashboard = () => {
   const { user, logout } = useAuth();
@@ -26,14 +29,17 @@ const CustomerDashboard = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     loadOrders();
-  }, []);
+  }, [tabValue, refreshKey]);
 
   const loadOrders = async () => {
+    setLoading(true);
     try {
       const response = await orderAPI.myOrders();
+      console.log('[Dashboard Orders]', response.data);
       setOrders(response.data.results || response.data);
     } catch (error) {
       console.error('Failed to load orders:', error);
@@ -69,10 +75,6 @@ const CustomerDashboard = () => {
 
   const handleCloseDialog = () => {
     setSelectedOrder(null);
-  };
-
-  const handleContactSupport = () => {
-    window.open('https://wa.me/6281234567890', '_blank');
   };
 
   if (loading) {
@@ -152,9 +154,9 @@ const CustomerDashboard = () => {
             variant="scrollable"
             scrollButtons="auto"
           >
-            <Tab label="📋 Semua Pesanan" icon={<TrackIcon />} iconPosition="start" />
-            <Tab label="⏳ Dalam Proses" icon={<HistoryIcon />} iconPosition="start" />
-            <Tab label="✅ Selesai" icon={<CheckCircleIcon />} iconPosition="start" />
+            <Tab label={`📋 Semua (${orders.length})`} />
+            <Tab label={`⏳ Dalam Proses (${orders.filter(o => !['COMPLETED', 'CANCELLED'].includes(o.status)).length})`} />
+            <Tab label={`✅ Selesai (${orders.filter(o => o.status === 'COMPLETED').length})`} />
           </Tabs>
         </Paper>
 
@@ -314,6 +316,23 @@ const CustomerDashboard = () => {
             
             <DialogContent dividers>
               <Grid container spacing={3}>
+                {/* 3D Preview if file exists */}
+                {selectedOrder.quote_info && (
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                      Preview 3D
+                    </Typography>
+                    <Paper variant="outlined" sx={{ p: 2 }}>
+                      <ThreeDViewer fileUrl={getFileUrl(selectedOrder.quote_info)} />
+                      <Box sx={{ mt: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                        <Chip label={`📦 ${selectedOrder.quote_info.volume?.toFixed(2)} cm³`} size="small" />
+                        <Chip label={`⚖️ ${selectedOrder.quote_info.weight?.toFixed(1)} gram`} size="small" />
+                        <Chip label={`📐 ${selectedOrder.quote_info.dimensions?.x?.toFixed(0)}×${selectedOrder.quote_info.dimensions?.y?.toFixed(0)}×${selectedOrder.quote_info.dimensions?.z?.toFixed(0)} mm`} size="small" />
+                      </Box>
+                    </Paper>
+                  </Grid>
+                )}
+
                 {/* Order Info */}
                 <Grid item xs={12} md={6}>
                   <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
@@ -345,18 +364,18 @@ const CustomerDashboard = () => {
                   <Paper variant="outlined" sx={{ p: 2 }}>
                     <Typography variant="body2"><strong>Nama:</strong> {selectedOrder.customer_name}</Typography>
                     <Typography variant="body2"><strong>Email:</strong> {selectedOrder.customer_email}</Typography>
-                    <Typography variant="body2"><strong>Telepon:</strong> {selectedOrder.customer_phone}</Typography>
+                    <Typography variant="body2"><strong>Telepon:</strong> {selectedOrder.customer_phone || '-'}</Typography>
                     {selectedOrder.customer_company && (
                       <Typography variant="body2"><strong>Perusahaan:</strong> {selectedOrder.customer_company}</Typography>
                     )}
                   </Paper>
                 </Grid>
 
-                {/* Production Stages */}
+                {/* Production Stages - STATUS MONITORING */}
                 {selectedOrder.stages?.length > 0 && (
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                      Tahapan Produksi
+                      📊 Tahapan Produksi
                     </Typography>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                       {selectedOrder.stages.map((stage, index) => (
@@ -368,8 +387,9 @@ const CustomerDashboard = () => {
                             gap: 2,
                             p: 1.5,
                             bgcolor: stage.status === 'COMPLETED' ? 'success.light' : 
-                                    stage.status === 'IN_PROGRESS' ? 'primary.light' : 'grey.100',
-                            borderRadius: 1
+                                   stage.status === 'IN_PROGRESS' ? 'primary.light' : 'grey.100',
+                            borderRadius: 1,
+                            opacity: stage.status === 'SKIPPED' ? 0.5 : 1
                           }}
                         >
                           <Avatar 
@@ -380,7 +400,8 @@ const CustomerDashboard = () => {
                                       stage.status === 'IN_PROGRESS' ? 'primary.main' : 'grey.400'
                             }}
                           >
-                            {index + 1}
+                            {stage.status === 'COMPLETED' ? '✓' : 
+                             stage.status === 'IN_PROGRESS' ? '⏳' : index + 1}
                           </Avatar>
                           <Box sx={{ flex: 1 }}>
                             <Typography variant="body2" fontWeight="medium">
@@ -391,10 +412,14 @@ const CustomerDashboard = () => {
                                 Mulai: {new Date(stage.started_at).toLocaleDateString('id-ID')}
                               </Typography>
                             )}
+                            {stage.assigned_to && (
+                              <Typography variant="caption" color="textSecondary" display="block">
+                                👤 {stage.assigned_to}
+                              </Typography>
+                            )}
                           </Box>
                           <Chip 
-                            label={stage.status === 'COMPLETED' ? '✓' : 
-                                   stage.status === 'IN_PROGRESS' ? '⏳' : '⏸'}
+                            label={stage.status_label || stage.status}
                             size="small"
                             color={stage.status === 'COMPLETED' ? 'success' : 
                                    stage.status === 'IN_PROGRESS' ? 'primary' : 'default'}
@@ -409,7 +434,7 @@ const CustomerDashboard = () => {
                 {selectedOrder.updates?.length > 0 && (
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                      Update Terbaru
+                      📢 Update Terbaru
                     </Typography>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       {selectedOrder.updates.map((update) => (
@@ -423,14 +448,6 @@ const CustomerDashboard = () => {
                             </Typography>
                           </Box>
                           <Typography variant="body2">{update.message}</Typography>
-                          {update.image && (
-                            <Box 
-                              component="img" 
-                              src={update.image} 
-                              alt="Update"
-                              sx={{ mt: 1, maxWidth: '100%', borderRadius: 1, maxHeight: 200, objectFit: 'cover' }}
-                            />
-                          )}
                         </Paper>
                       ))}
                     </Box>
@@ -443,7 +460,7 @@ const CustomerDashboard = () => {
               <Button 
                 variant="outlined" 
                 startIcon={<WhatsAppIcon />}
-                onClick={handleContactSupport}
+                onClick={() => window.open('https://wa.me/6281234567890', '_blank')}
               >
                 Chat via WhatsApp
               </Button>

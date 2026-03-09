@@ -2,11 +2,13 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from datetime import timedelta
 
-from .models import Profile, Order, ProductionStage, OrderUpdate
+from accounts.models import Profile
+from .models import Order, ProductionStage, OrderUpdate
 from .serializers import (
     OrderSerializer, ProductionStageSerializer, 
     OrderUpdateSerializer, GuestQuoteRequestSerializer
@@ -15,7 +17,6 @@ from quotes.models import Quote
 
 
 class OrderViewSet(viewsets.ModelViewSet):
-    """Manage orders - for authenticated users and admins"""
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
@@ -23,13 +24,14 @@ class OrderViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
+        
         if user.is_staff:
             # Admin sees all orders
             return Order.objects.all().prefetch_related('stages', 'updates')
-        # Customer sees only their orders
+     
         return Order.objects.filter(
-            Profile.Q(user=user) | Profile.Q(customer_email=user.email)
-        ).prefetch_related('stages', 'updates')
+            Profile.models.Q(user=user) | Profile.models.Q(customer_email=user.email)
+        ).prefetch_related('stages', 'updates').order_by('-created_at')
     
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
     def update_status(self, request, pk=None):
@@ -124,11 +126,16 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def my_orders(self, request):
         """Get orders for current user"""
-        queryset = self.get_queryset().filter(user=request.user)
-        page = self.paginate_queryset(queryset)
+        queryset = self.get_queryset()
+
+        paginator = PageNumberPagination()
+        paginator.page_size = 20
+        
+        page = paginator.paginate_queryset(queryset, request)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            return paginator.get_paginated_response(serializer.data)
+        
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 

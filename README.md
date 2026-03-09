@@ -6,7 +6,7 @@ Building a Crowdfunding Platform with Django and React
 # Step 1: Project Setup 
 ## Backend (Django)
 ### Create virtual environment
-    python -m venv .venv
+    python -3.10 -m venv .venv
     
 #### On Linux: 
     source .venv/bin/activate  

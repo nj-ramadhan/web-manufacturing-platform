@@ -259,7 +259,15 @@ const QuoteGenerator = () => {
                 Preview 3D
               </Typography>
               
-              <ThreeDViewer fileUrl={file?.file_url} />
+              <ThreeDViewer 
+                fileUrl={
+                  file?.file_url 
+                    ? (file.file_url.startsWith('http') 
+                        ? file.file_url 
+                        : `http://localhost:8000${file.file_url}`)
+                    : null
+                }
+              />
               
               {/* File Analysis Results */}
               {file?.is_valid && (

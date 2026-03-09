@@ -1,27 +1,34 @@
-// frontend/src/pages/PublicQuoteRequest.js
-import React, { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+// frontend/src/pages/PublicQuoteRequest.js - ADD LOGIN BUTTON
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';  // ⚠️ Add Link import
 import { useDropzone } from 'react-dropzone';
 import axios from 'axios';
 import {
   Container, Box, Typography, Paper, Grid, TextField,
   Button, Stepper, Step, StepLabel, Alert, Chip,
   FormControl, InputLabel, Select, MenuItem,
-  Checkbox, FormControlLabel, Divider, CircularProgress
+  Checkbox, FormControlLabel, Divider, CircularProgress,
+  IconButton, Avatar, Tooltip
 } from '@mui/material';
 import {
   CloudUpload as UploadIcon,
   CheckCircle as CheckCircleIcon,
   Info as InfoIcon,
-  WhatsApp as WhatsAppIcon
+  WhatsApp as WhatsAppIcon,
+  Login as LoginIcon,  // ⚠️ Add Login icon
+  AccountCircle as AccountIcon
 } from '@mui/icons-material';
 import { formatIDR } from '../utils/currency';
 import ThreeDViewer from '../components/ThreeDViewer';
+import { useAuth } from '../context/AuthContext';  // ⚠️ Import useAuth
 
 const API_BASE = 'http://localhost:8000/api';
 
 const PublicQuoteRequest = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();  // ⚠️ Get auth state
+  
+  // ... existing state ...
   const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -29,22 +36,10 @@ const PublicQuoteRequest = () => {
   const [orderNumber, setOrderNumber] = useState(null);
   
   const [formData, setFormData] = useState({
-    // Contact info
-    name: '',
-    email: '',
-    phone: '',
-    company: '',
-    
-    // Project details
-    manufacturing_type: '3D_PRINTING',
-    material: 'PLA',
-    quantity: 1,
-    requirements: '',
-    deadline: '',
-    
-    // Consent
-    agree_to_terms: false,
-    agree_to_contact: false,
+    name: '', email: '', phone: '', company: '',
+    manufacturing_type: '3D_PRINTING', material: 'PLA', quantity: 1,
+    requirements: '', deadline: '',
+    agree_to_terms: false, agree_to_contact: false,
   });
   
   const [uploadedFile, setUploadedFile] = useState(null);
@@ -72,6 +67,55 @@ const PublicQuoteRequest = () => {
     ],
   };
 
+  const handleLoginClick = () => {
+    // Save current progress to sessionStorage so user can resume after login
+    const progress = {
+      step: activeStep,
+      formData,
+      uploadedFile: uploadedFile ? { id: uploadedFile.id, name: uploadedFile.original_filename } : null,
+      fileAnalysis,
+      timestamp: Date.now()
+    };
+    sessionStorage.setItem('quote_progress', JSON.stringify(progress));
+    
+    // Navigate to login with return URL
+    navigate('/login', { 
+      state: { 
+        from: '/public-quote',
+        message: 'Login untuk melanjutkan permintaan penawaran Anda'
+      } 
+    });
+  };
+
+    useEffect(() => {
+    if (user) {
+      // User just logged in, check for saved progress
+      const savedProgress = sessionStorage.getItem('quote_progress');
+      if (savedProgress) {
+        try {
+          const progress = JSON.parse(savedProgress);
+          // Restore progress if recent (< 1 hour)
+          if (Date.now() - progress.timestamp < 3600000) {
+            setActiveStep(progress.step);
+            setFormData(progress.formData);
+            if (progress.uploadedFile) {
+              // Reload file info from API
+              axios.get(`${API_BASE}/files/${progress.uploadedFile.id}/`)
+                .then(res => {
+                  setUploadedFile(res.data);
+                  setFileAnalysis(progress.fileAnalysis);
+                });
+            }
+            setSuccess('Progress Anda telah dipulihkan! Silakan lanjutkan.');
+          }
+          sessionStorage.removeItem('quote_progress');
+        } catch (e) {
+          console.error('Failed to restore progress:', e);
+        }
+      }
+    }
+  }, [user]);
+  
   const onDrop = useCallback(async (acceptedFiles) => {
     const file = acceptedFiles[0];
     const formData = new FormData();
@@ -264,7 +308,15 @@ const submitQuoteRequest = async () => {
                 
                 <Grid container spacing={2}>
                   <Grid item xs={12} md={6}>
-                    <ThreeDViewer fileUrl={uploadedFile.file_url} />
+                    <ThreeDViewer 
+                      fileUrl={
+                        uploadedFile?.file_url 
+                          ? (uploadedFile.file_url.startsWith('http') 
+                              ? uploadedFile.file_url 
+                              : `http://localhost:8000${uploadedFile.file_url}`)
+                          : null
+                      } 
+                    />
                   </Grid>
                   <Grid item xs={12} md={6}>
                     <Paper variant="outlined" sx={{ p: 2 }}>
@@ -612,19 +664,70 @@ const submitQuoteRequest = async () => {
   return (
     <Container maxWidth="md">
       <Box sx={{ py: 4 }}>
-        {/* Header */}
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
-          <Typography variant="h3" fontWeight="bold" gutterBottom>
-            🚀 Minta Penawaran Harga
-          </Typography>
-          <Typography variant="body1" color="textSecondary">
-            Upload file 3D, atur spesifikasi, dan dapatkan penawaran dalam 1x24 jam
-          </Typography>
+        
+        {/* ⚠️ HEADER WITH LOGIN BUTTON */}
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          mb: 3,
+          pb: 2,
+          borderBottom: '1px solid #e0e0e0'
+        }}>
+          <Box>
+            <Typography variant="h4" fontWeight="bold">
+              🚀 Minta Penawaran Harga
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Upload file 3D, atur spesifikasi, dan dapatkan penawaran dalam 1x24 jam
+            </Typography>
+          </Box>
+          
+          {/* ⚠️ LOGIN BUTTON */}
+          {user ? (
+            // User is logged in - show profile
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
+                {user.username?.[0]?.toUpperCase()}
+              </Avatar>
+              <Typography variant="body2" fontWeight="medium">
+                {user.username}
+              </Typography>
+            </Box>
+          ) : (
+            // Guest user - show login button
+            <Button
+              variant="outlined"
+              startIcon={<LoginIcon />}
+              onClick={handleLoginClick}
+              sx={{
+                borderColor: 'primary.main',
+                color: 'primary.main',
+                '&:hover': {
+                  borderColor: 'primary.dark',
+                  bgcolor: 'primary.light'
+                }
+              }}
+            >
+              Login / Register
+            </Button>
+          )}
         </Box>
+
+        {/* ⚠️ PROGRESS BANNER FOR LOGGED-IN GUESTS */}
+        {user && activeStep > 0 && (
+          <Alert 
+            severity="success" 
+            icon={<CheckCircleIcon />}
+            sx={{ mb: 2 }}
+          >
+            👋 Halo {user.username}! Progress permintaan penawaran Anda telah disimpan.
+          </Alert>
+        )}
 
         {/* Stepper */}
         <Stepper activeStep={activeStep} sx={{ mb: 4 }} alternativeLabel>
-          {steps.map((label, index) => (
+          {['Upload File', 'Detail Proyek', 'Kontak & Konfirmasi'].map((label) => (
             <Step key={label}>
               <StepLabel>{label}</StepLabel>
             </Step>
@@ -638,7 +741,7 @@ const submitQuoteRequest = async () => {
           </Alert>
         )}
         {success && (
-          <Alert severity="success" sx={{ mb: 2 }}>
+          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
             {success}
           </Alert>
         )}
@@ -653,7 +756,7 @@ const submitQuoteRequest = async () => {
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
             <Button
               disabled={activeStep === 0 || loading}
-              onClick={handleBack}
+              onClick={() => setActiveStep(prev => prev - 1)}
             >
               Kembali
             </Button>
@@ -674,10 +777,28 @@ const submitQuoteRequest = async () => {
           </Box>
         )}
 
+        {/* ⚠️ FOOTER WITH LOGIN REMINDER */}
+        {!user && (
+          <Box sx={{ mt: 4, textAlign: 'center', color: 'text.secondary' }}>
+            <Typography variant="body2" display="flex" alignItems="center" justifyContent="center" gap={1}>
+              Sudah punya akun?{' '}
+              <Button 
+                size="small" 
+                onClick={handleLoginClick}
+                endIcon={<LoginIcon />}
+                sx={{ textTransform: 'none', fontWeight: 'medium' }}
+              >
+                Login di sini
+              </Button>
+              {' '}untuk melacak pesanan & riwayat penawaran
+            </Typography>
+          </Box>
+        )}
+
         {/* Trust Badges */}
-        <Box sx={{ mt: 4, textAlign: 'center', color: 'text.secondary' }}>
+        <Box sx={{ mt: 3, textAlign: 'center', color: 'text.secondary' }}>
           <Typography variant="caption" display="block">
-            🔒 Data Anda aman • 🇮🇩 Produksi lokal • ⭐ 500+ project selesai
+            🔒 Data aman • 🇮🇩 Produksi lokal • ⭐ 500+ project selesai
           </Typography>
         </Box>
       </Box>

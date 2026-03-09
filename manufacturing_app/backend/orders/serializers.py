@@ -52,7 +52,6 @@ class OrderUpdateSerializer(serializers.ModelSerializer):
     def get_created_at_formatted(self, obj):
         return obj.created_at.astimezone().strftime('%d %b %Y, %H:%M WIB')
 
-
 class OrderSerializer(serializers.ModelSerializer):
     quote_info = serializers.SerializerMethodField()
     stages = ProductionStageSerializer(many=True, read_only=True)
@@ -78,15 +77,19 @@ class OrderSerializer(serializers.ModelSerializer):
     
     def get_quote_info(self, obj):
         if obj.quote and obj.quote.uploaded_file:
+            file = obj.quote.uploaded_file
+            file_url = file.file.url if file.file else None
+            
             return {
-                'file_name': obj.quote.uploaded_file.original_filename,
-                'volume': obj.quote.uploaded_file.volume,
-                'weight': obj.quote.uploaded_file.weight,
+                'file_name': file.original_filename,
+                'volume': file.volume,
+                'weight': file.weight,
                 'dimensions': {
-                    'x': obj.quote.uploaded_file.bounding_box_x,
-                    'y': obj.quote.uploaded_file.bounding_box_y,
-                    'z': obj.quote.uploaded_file.bounding_box_z,
-                }
+                    'x': file.bounding_box_x,
+                    'y': file.bounding_box_y,
+                    'z': file.bounding_box_z,
+                },
+                'file_url': file_url,  # Returns: /media/uploads/...
             }
         return None
     
